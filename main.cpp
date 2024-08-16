@@ -3,7 +3,7 @@
 #include <utility>
 #include <bits/stdc++.h> 
 
-#define SIZE 9
+#define SIZE 8
 
 using namespace std;
 
@@ -29,7 +29,7 @@ class OrderedFile {
 
     int get_n(int pos, int range) {
       int n = 0;
-      for(int i = pos; i < (pos + range); i++) 
+      for(int i = pos; i < (pos + range) && i < this->list.size; i++) 
         n += (!list.values[i].is_null);
       return n;
     }
@@ -56,7 +56,8 @@ class OrderedFile {
         }
 
         if(mid < low) return low;
-        if(this->list.values[mid].value < x) low = mid + 1;
+        if(this->list.values[mid].value == x) return mid;
+        else if(this->list.values[mid].value < x) low = mid + 1;
         else high = mid - 1;
       }
       return low;
@@ -99,27 +100,53 @@ class OrderedFile {
       this->list.values = items;
     }
 
-    void redistribute(int pos, int range) {}
+    void redistribute(int pos, int range) {
+      int n = get_n(pos, range);
+      Data items[n];
+      int j = 0;
 
-    void rebalance(int pos, int range) {}
+      for(int i = pos; i < (pos + range) && i < this->list.size; i++) {
+        if(!this->list.values[i].is_null) {
+          items[j] = this->list.values[i];
+          this->list.values[i].is_null = true;
+          j++;
+        }
+      }
+
+      int i_pos = pos;
+      double step = ceil(((double) range)/n);
+      for(int i = 0; i < j; i++) {
+        int in = i_pos;
+        this->list.values[i_pos] = items[i];
+        this->list.values[i_pos].is_null = false;
+        i_pos = (i_pos + step) >= (pos + range) ? i_pos + 1 : i_pos + step;
+        if(i_pos >= this->list.size) shift_right(i_pos);
+      }
+    }
     
-    void scan(int pos, int range) {
+    void scan(int pos, int range, int height, int depth) {
+      if(range >= this->list.size) {
+        table_doubling();
+        return redistribute(pos, this->list.size);
+      }
+      
       int pos_range = pos % range;
       int pos_init_range =  pos - pos_range;
-      int height = log2(this->list.size);
 
       double density = get_density(pos_init_range, range);
-      pair<double, double> bound = get_density_bound(height, height);
+      pair<double, double> bound = get_density_bound(height, depth);
 
-      if(density < bound.first || density >= bound.second)
-        return rebalance(pos, pos_init_range); 
-
-        // [0 // 1 // 2 3 4 5 10]
-        //  0  1 2 3 4 5 6 7  8
+      if(density < bound.first || density >= bound.second) { // quando nao ta no limite
+        if(pos + range >= this->list.size) { pos = pos - range; }
+        scan(pos, range + range, height, depth - 1);
+      } 
+      else if(range != this->get_range()) redistribute(pos, range);
+      
     }
 
   public:
     void insert(int x) {
+      cout << "INC " << x << endl;
       Data item;
       item.value = x;
       item.is_null = false;
@@ -135,13 +162,11 @@ class OrderedFile {
       else {
         if(this->list.values[pos].value > x) 
           this->shift_right(pos);
-        else {
-          pos = pos < (this->list.size - 1) ? pos + 1 : pos;
-          if(!this->list.values[pos].is_null)
-            this->shift_left(pos);
-        }
+        else 
+          this->shift_left(pos);
         this->list.values[pos] = item;
       }
+      int height = log2(this->list.size);
 
       for(int i = 0; i < this->list.size; i++) {
         if(this->list.values[i].is_null) 
@@ -151,7 +176,16 @@ class OrderedFile {
       }
       cout << endl;
 
-      scan(pos, this->get_range());
+      scan(pos, this->get_range(), height, height);
+
+      for(int i = 0; i < this->list.size; i++) {
+        if(this->list.values[i].is_null) 
+          cout << "//" << ' ';
+        else
+          cout << this->list.values[i].value << ' ';
+      }
+      cout << endl;
+
     }
     void remove(){}
 };
@@ -159,15 +193,15 @@ class OrderedFile {
 int main() {
   OrderedFile file;
 
-  file.insert(1);
-  file.insert(2);
+  file.insert(5);
+  file.insert(4);
   file.insert(3);
-  file.insert(10);
-  file.insert(8);
+  file.insert(2);
+  file.insert(1);
   file.insert(19);
   file.insert(33);
   file.insert(23);
-  file.insert(22);
+  file.insert(0);
 
   return 0;
 }
