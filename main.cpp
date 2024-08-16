@@ -130,11 +130,8 @@ class OrderedFile {
       if(this->list.values[pos].is_null) 
         this->list.values[pos] = item;
       else {
-        if(this->list.values[pos].value > x) {
-          if(!this->list.values[pos].is_null) 
-            this->shift_right(pos);
-        }
-
+        if(this->list.values[pos].value > x) 
+          this->shift_right(pos);
         else {
           pos = pos < (this->list.size - 1) ? pos + 1 : pos;
           if(!this->list.values[pos].is_null)
