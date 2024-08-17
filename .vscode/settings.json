@@ -111,6 +111,9 @@
     "optional": "cpp",
     "ratio": "cpp",
     "variant": "cpp",
-    "regex": "cpp"
+    "regex": "cpp",
+    "bitset": "cpp",
+    "ranges": "cpp",
+    "span": "cpp"
   }
 }

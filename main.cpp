@@ -27,17 +27,18 @@ class OrderedFile {
 
     int get_range() { return log2(this->list.size); }
 
-    int get_n(int pos, int range) {
+    int get_n(int begin, int end) {
       int n = 0;
-      for(int i = pos; i < (pos + range) && i < this->list.size; i++) 
+      for(int i = begin; i <= end; i++) 
         n += (!list.values[i].is_null);
       return n;
     }
 
-    double get_density(int pos, int range) { return ((double) get_n(pos, range)/range); }
+    double get_density(int begin, int end) { return ((double) get_n(begin, end)/(end - begin + 1)); }
 
-    pair<double, double> get_density_bound(int h, int d) {
+    pair<double, double> get_density_bound(int d) {
       pair<double, double> bound;
+      int h = floor(log2(2 * this->get_range() - 1));
       bound.first = 0.5 - (0.25 * (d/h));
       bound.second = 0.75 + (0.25 * (d/h));
       return bound;
@@ -100,12 +101,12 @@ class OrderedFile {
       this->list.values = items;
     }
 
-    void redistribute(int pos, int range) {
-      int n = get_n(pos, range);
+    void redistribute(int begin, int end) {
+      int n = get_n(begin, end);
       Data items[n];
       int j = 0;
 
-      for(int i = pos; i < (pos + range) && i < this->list.size; i++) {
+      for(int i = begin; i <= end; i++) {
         if(!this->list.values[i].is_null) {
           items[j] = this->list.values[i];
           this->list.values[i].is_null = true;
@@ -113,40 +114,53 @@ class OrderedFile {
         }
       }
 
-      int i_pos = pos;
-      double step = ceil(((double) range)/n);
+      int range = this->get_range();
+      int pos = begin, n_values = 0;
+      int depth = floor(log2(2 * this->get_range() - 1));
+      pair<double, double> bound = get_density_bound(depth);
+
       for(int i = 0; i < j; i++) {
-        int in = i_pos;
-        this->list.values[i_pos] = items[i];
-        this->list.values[i_pos].is_null = false;
-        i_pos = (i_pos + step) >= (pos + range) ? i_pos + 1 : i_pos + step;
-        if(i_pos >= this->list.size) shift_right(i_pos);
+        this->list.values[pos + n_values] = items[i];
+        this->list.values[pos + n_values].is_null = false;
+        n_values++;
+
+        if(pos == (this->list.size - 2) && (range & 1)) range = 2;
+        double density = ((double) (n_values + 1.0)/(range));
+
+        if(density < bound.first || density >= bound.second) { 
+          pos += range;
+          n_values = 0;
+        }
       }
     }
     
-    void scan(int pos, int range, int height, int depth) {
-      if(range >= this->list.size) {
+    void scan(int begin, int end, int depth) {
+      double density = get_density(begin, end);
+      pair<double, double> bound = get_density_bound(depth);
+      int size = end - begin + 1;
+
+      if(size == this->list.size && density >= bound.second) {
         table_doubling();
-        return redistribute(pos, this->list.size);
+        return redistribute(begin, this->list.size - 1);
       }
-      
-      int pos_range = pos % range;
-      int pos_init_range =  pos - pos_range;
 
-      double density = get_density(pos_init_range, range);
-      pair<double, double> bound = get_density_bound(height, depth);
-
-      if(density < bound.first || density >= bound.second) { // quando nao ta no limite
-        if(pos + range >= this->list.size) { pos = pos - range; }
-        scan(pos, range + range, height, depth - 1);
+      int range = this->get_range();
+      if(density >= bound.second) { // quando nao ta no limite
+        if((begin == this->list.size - 2) && (range & 1)) {
+            begin -= 2 * range; 
+            scan(begin, end, depth - 2);
+        }
+        int index = begin / range;
+        if(index & 1) begin -= size; 
+        else 
+          end = (end + size) >= this->list.size ? this->list.size - 1 : end + size;
+        scan(begin, end, depth - 1);
       } 
-      else if(range != this->get_range()) redistribute(pos, range);
-      
+      redistribute(begin, end);
     }
 
   public:
     void insert(int x) {
-      cout << "INC " << x << endl;
       Data item;
       item.value = x;
       item.is_null = false;
@@ -157,6 +171,7 @@ class OrderedFile {
       }
 
       int pos = binary_search(x);
+      pos = pos >= this->list.size ? this->list.size - 1 : pos;
       if(this->list.values[pos].is_null) 
         this->list.values[pos] = item;
       else {
@@ -166,26 +181,18 @@ class OrderedFile {
           this->shift_left(pos);
         this->list.values[pos] = item;
       }
-      int height = log2(this->list.size);
+      
+      int range = this->get_range();
+      int i_range = pos % range;
+      int begin =  pos - i_range; 
+      int depth = floor(log2(2 * this->get_range() - 1));
+      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
 
-      for(int i = 0; i < this->list.size; i++) {
-        if(this->list.values[i].is_null) 
-          cout << "//" << ' ';
-        else
-          cout << this->list.values[i].value << ' ';
-      }
-      cout << endl;
+      double density = get_density(begin, end);
+      pair<double, double> bound = get_density_bound(depth);
 
-      scan(pos, this->get_range(), height, height);
-
-      for(int i = 0; i < this->list.size; i++) {
-        if(this->list.values[i].is_null) 
-          cout << "//" << ' ';
-        else
-          cout << this->list.values[i].value << ' ';
-      }
-      cout << endl;
-
+      if(density < bound.first || density >= bound.second) 
+        scan(begin, end, depth);
     }
     void remove(){}
 };
