@@ -64,8 +64,9 @@ class OrderedFile {
         this->values[pos] = value;
       }
 
-      void table_doubling() {
-        int size = this->size * 2, j = 0;
+      void change_size(int size) {
+        int j = 0;
+        size = size < SIZE ? SIZE : size;
         Data *items = new Data[size];
         
         for(int i = 0; i < this->size; i++) {
@@ -159,7 +160,7 @@ class OrderedFile {
       int size = end - begin + 1;
 
       if(size == this->list.size && density >= bound.second) {
-        this->list.table_doubling();
+        this->list.change_size(this->list.size * 2);
         return redistribute(begin, this->list.size - 1);
       }
 
