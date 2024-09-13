@@ -114,6 +114,9 @@
     "regex": "cpp",
     "bitset": "cpp",
     "ranges": "cpp",
-    "span": "cpp"
+    "span": "cpp",
+    "valarray": "cpp",
+    "forward_list": "cpp",
+    "list": "cpp"
   }
 }
