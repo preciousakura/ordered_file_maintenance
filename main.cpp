@@ -121,6 +121,8 @@ class OrderedFile {
     }
 
     void redistribute(int begin, int end) {
+      end = end >= this->list.size ? this->list.size - 1 : end;
+
       int n = this->list.get_n(begin, end);
       Data items[n];
       int j = 0;
@@ -153,29 +155,44 @@ class OrderedFile {
       }
     }
     
-    void scan(int begin, int end, int depth) {
+    void scan(int begin, int end, int depth, bool upper_limit) {
       double density = this->list.get_density(begin, end);
       pair<double, double> bound = this->list.get_density_bound(depth);
       int size = end - begin + 1;
+      bool out_bounds =  upper_limit ? density >= bound.second : density < bound.first;
 
-      if(size == this->list.size && density >= bound.second) 
-        this->list.change_size(this->list.size * 2);
+      if(size == this->list.size && out_bounds) 
+        this->list.change_size(upper_limit ? this->list.size * 2 : this->list.size / 2);
       else {
         int range = this->list.get_range();
-        if(density >= bound.second) { // quando nao ta no limite
+        if(out_bounds) { // quando nao ta no limite
           if((begin == this->list.size - 2) && (range & 1)) {
               begin -= 2 * range; 
-              scan(begin, end, depth - 2);
+              scan(begin, end, depth - 2, upper_limit);
           }
           int index = begin / range;
           if(index & 1) begin -= size; 
           else 
             end = (end + size) >= this->list.size ? this->list.size - 1 : end + size;
-          scan(begin, end, depth - 1);
+          scan(begin, end, depth - 1, upper_limit);
         } 
       }
 
       redistribute(begin, end);
+    }
+
+    void start_scan(int pos, bool upper_limit) {
+      int range = this->list.get_range();
+      int begin =  pos - (pos % range); 
+      int depth = this->list.get_height();
+      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
+
+      double density = this->list.get_density(begin, end);
+      pair<double, double> bound = this->list.get_density_bound(depth);
+      bool out_bounds =  upper_limit ? density >= bound.second : density < bound.first;
+
+      if(out_bounds) 
+        scan(begin, end, depth, upper_limit);
     }
 
   public:
@@ -201,16 +218,7 @@ class OrderedFile {
         this->list.values[pos] = item;
       }
       
-      int range = this->list.get_range();
-      int begin =  pos - (pos % range); 
-      int depth = this->list.get_height();
-      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
-
-      double density = this->list.get_density(begin, end);
-      pair<double, double> bound = this->list.get_density_bound(depth);
-
-      if(density >= bound.second) 
-        scan(begin, end, depth);
+      start_scan(pos, true);
     }
 
     void remove(int x){
@@ -218,17 +226,7 @@ class OrderedFile {
       Data value = this->list.values[pos];
       if(!value.is_null && value.value == x) {
         this->list.values[pos].is_null = true;
-
-        int range = this->list.get_range();
-        int begin =  pos - (pos % range); 
-        int depth = this->list.get_height();
-        int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
-
-        double density = this->list.get_density(begin, end);
-        pair<double, double> bound = this->list.get_density_bound(depth);
-
-        if(density < bound.first || density >= bound.second) 
-          scan(begin, end, depth);
+        start_scan(pos, false);
       }
     }
     
@@ -247,13 +245,15 @@ int main() {
   file.insert(33);
   file.insert(23);
   file.insert(0);
-
   file.print();
-
   file.remove(3);
-
   file.print();
-
+  file.remove(4);
+  file.print();
+  file.remove(5);
+  file.print();
+  file.insert(3);
+  file.print();
 
   return 0;
 }
