@@ -209,33 +209,29 @@ class OrderedFile {
         return;
       }
 
-      if((this->list.get_n(0, this->list.size - 1) + 1) > this->list.size) {
-        this->list.change_size(this->list.size * 2);
-      }
-
       int pos = binary_search(x);   
-      int range = this->list.get_range();
-      int begin =  pos - (pos % range); 
-      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
-      double density = this->list.get_density(begin, end, this->list.get_n(begin, end));
 
       if(this->list.values[pos].is_null) {
         this->list.values[pos] = item;
-      }
-      else {
-        if(this->list.values[pos].value > x) 
-          this->list.shift_right(pos);
-        else 
-          this->list.shift_left(pos);
-        this->list.values[pos] = item;
+        return;
       }
 
+      int range = this->list.get_range();
+      int begin =  pos - (pos % range); 
+      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
+      double density = this->list.get_density(begin, end, this->list.get_n(begin, end) + 1);
       int depth = this->list.get_height();
       pair<double, double> bound = this->list.get_density_bound(depth);
       bool out_bounds =  density > bound.second || density < bound.first;
 
       if(out_bounds) 
         scan(begin, end, depth, true);
+
+      if(this->list.values[pos].value > x) 
+        this->list.shift_right(pos);
+      else 
+        this->list.shift_left(pos);
+      this->list.values[pos] = item;
     }
 
     void remove(int x){
@@ -253,15 +249,15 @@ class OrderedFile {
 int main() {
   OrderedFile file;
 
-  file.insert(1);
+  file.insert(8);
   file.print();
-  file.insert(2);
+  file.insert(7);
   file.print();
-  file.insert(4);
-  file.print();
-  file.insert(3);
+  file.insert(6);
   file.print();
   file.insert(5);
+  file.print();
+  file.insert(4);
   file.print();
   file.insert(6);
   file.print();
