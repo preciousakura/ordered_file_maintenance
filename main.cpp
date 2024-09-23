@@ -120,10 +120,11 @@ class OrderedFile {
       return low;
     }
 
-    void redistribute(int begin, int end) {
-      end = end >= this->list.size ? this->list.size - 1 : end;
-
+    void redistribute(int begin, int end, Data item) {
       int n = this->list.get_n(begin, end);
+      int blank_space = (end - begin + 1) - n;
+      int steps = ceil((double) blank_space / (n - 1));
+
       Data items[n];
       int j = 0;
 
@@ -135,67 +136,14 @@ class OrderedFile {
         }
       }
 
-      int range = this->list.get_range();
-      int pos = begin, n_values = 0;
-      int depth = this->list.get_height();
-      pair<double, double> bound = this->list.get_density_bound(depth);
-
+      int pos = begin;
       for(int i = 0; i < j; i++) {
-        this->list.values[pos + n_values] = items[i];
-        this->list.values[pos + n_values].is_null = false;
-        n_values++;
-
-        if(pos == (this->list.size - 2) && (range & 1)) range = 2;
-        double density = ((double) (n_values + 1.0)/(range));
-
-        if(density < bound.first || density >= bound.second) { 
-          pos += range;
-          n_values = 0;
-        }
-      }
-    }
-    
-    void scan(int begin, int end, int depth, bool upper_limit) {
-      double density = this->list.get_density(begin, end, this->list.get_n(begin, end));
-      pair<double, double> bound = this->list.get_density_bound(depth);
-      int size = end - begin + 1;
-      bool out_bounds =  upper_limit ? density > bound.second : density < bound.first;
-
-      if(size >= this->list.size && out_bounds) {
-        this->list.change_size(upper_limit ? this->list.size * 2 : this->list.size / 2);
-        begin = 0; end = this->list.size - 1;
-      }
-      else {
-        int range = this->list.get_range();
-        if(out_bounds) { 
-          depth -= 1;
-          if((begin == this->list.size - 2) && (range & 1)) {
-            begin -= 2 * range; depth -= 1; 
-          }
-          int index = begin / range;
-          if(index & 1) begin -= size; 
-          else {
-            end = (end + size) >= this->list.size ? this->list.size - 1 : end + size;
-          }
-          scan(begin, end, depth, upper_limit);
-        } 
+        this->list.values[pos] = items[i];
+        pos += steps + 1;
       }
 
-      redistribute(begin, end);
-    }
-
-    void start_scan(int pos, bool upper_limit) {
-      // int range = this->list.get_range();
-      // int begin =  pos - (pos % range); 
-      // int depth = this->list.get_height();
-      // int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
-
-      // double density = this->list.get_density(begin, end, this->list.get_n(begin, end) + 1);
-      // pair<double, double> bound = this->list.get_density_bound(depth);
-      // bool out_bounds =  upper_limit ? density > bound.second : density < bound.first;
-
-      // if(out_bounds) 
-      //   scan(begin, end, depth, upper_limit);
+      this->list.print();
+      this->list.print();
     }
 
   public:
@@ -219,28 +167,67 @@ class OrderedFile {
       int range = this->list.get_range();
       int begin =  pos - (pos % range); 
       int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
-      double density = this->list.get_density(begin, end, this->list.get_n(begin, end) + 1);
+
+      int end_total = end;
+      int begin_total = begin;
+
+      int size = end - begin + 1;
+      int element_count = this->list.get_n(begin, end) + 1;
+      int leaf_idx = begin / this->list.get_range();
+      int range_increase = 1;
+      
+      double density = this->list.get_density(begin, end, element_count);
       int depth = this->list.get_height();
       pair<double, double> bound = this->list.get_density_bound(depth);
       bool out_bounds =  density > bound.second || density < bound.first;
 
-      if(out_bounds) 
-        scan(begin, end, depth, true);
+      if(!out_bounds) {
+        if(this->list.values[pos].value > x) 
+          this->list.shift_right(pos);
+        else 
+          this->list.shift_left(pos);
+        this->list.values[pos] = item;
+        return;
+      }
+
+      while(out_bounds && !((end_total - begin_total + 1) == this->list.size)) {
+        if (leaf_idx & 1) {
+          end = begin - 1;
+          begin = begin - range_increase * this->list.get_range();
+        }
+        else {
+          begin   =  end + 1;  
+          end =  end + range_increase * this->list.get_range();
+        }
+
+        range_increase *= 2;
+        leaf_idx = leaf_idx >> 1;
+        begin_total =  begin < begin_total ? begin : begin_total;
+        end_total =  end > end_total ? end : end_total;
+
+        size += end - begin + 1; 
+        element_count += this->list.get_n(begin, end);
+        density = ((double) element_count / size); 
+        depth--;
+
+        pair<double, double> bound = this->list.get_density_bound(depth);
+        out_bounds =  density > bound.second || density < bound.first;
+
+        if (((end_total - begin_total + 1) == this->list.size) && out_bounds) {
+          this->list.change_size(this->list.size * 2);
+        }
+      }
 
       if(this->list.values[pos].value > x) 
         this->list.shift_right(pos);
       else 
         this->list.shift_left(pos);
       this->list.values[pos] = item;
+      redistribute(begin_total, end_total, item);
     }
 
     void remove(int x){
       int pos = binary_search(x);
-      Data value = this->list.values[pos];
-      if(!value.is_null && value.value == x) {
-        this->list.values[pos].is_null = true;
-        start_scan(pos, false);
-      }
     }
     
     void print() { this->list.print(); }
