@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <utility>
 #include <bits/stdc++.h> 
+#include <fstream>
+#include <sstream>
+#include <string.h>
 
 #define SIZE 8
 
@@ -22,7 +25,11 @@ class OrderedFile {
 
       List(): values(new Data[SIZE]) {}
 
-      int get_range() { return log2(this->size); }
+      int get_range() { 
+        int log_n = log2(this->size);
+        int n_leafs = ceil((double)this->size / (double)log_n);
+        return pow(2,(int)round(log2(n_leafs)));
+      }
 
       int get_height() { return floor(log2(this->size/this->get_range())); }
 
@@ -81,6 +88,13 @@ class OrderedFile {
         this->values = items;
       }
 
+      void print(ofstream& file) {
+        for(int i = 0; i < size; i++) 
+          if(!this->values[i].is_null) 
+            file << this->values[i].value << ' ';
+        file << endl;
+      }
+
       void print() {
         for(int i = 0; i < size; i++) {
           if(this->values[i].is_null) cout << "//" << ' ';
@@ -123,7 +137,6 @@ class OrderedFile {
     void redistribute(int begin, int end) {
       int n = this->list.get_n(begin, end);
       int blank_space = (end - begin + 1) - n;
-      int steps = ceil((double) blank_space / (n - 1));
 
       Data items[n];
       int j = 0;
@@ -137,10 +150,11 @@ class OrderedFile {
       }
 
       int pos = begin;
+      int block = (n/blank_space) + 1;
       for(int i = 0; i < j; i++) {
+        if(i > block - 1 && i%block == 0) pos++;
         this->list.values[pos] = items[i];
-        if(pos + steps + 1 > end) { pos += 1; }
-        else { pos += steps + 1; } 
+        pos++;
       }
     }
 
@@ -189,14 +203,7 @@ class OrderedFile {
       }
 
       while(out_bounds && !((end_total - begin_total + 1) == this->list.size)) {
-        int leaf_size = ceil((double)size/range);
-        if(size < range * leaf_size) {
-          end = begin - 1;
-          int b = begin - range_increase * 2 * range;
-          begin = b < 0 ? 0 : b;
-          depth--;
-        }
-        else if (leaf_idx & 1) {
+        if (leaf_idx & 1) {
           end = begin - 1;
           begin = begin - range_increase * range;
         }
@@ -219,11 +226,11 @@ class OrderedFile {
 
         bound = this->list.get_density_bound(depth);
         out_bounds =  density > bound.second || density < bound.first;
+      }
 
-        if (((end_total - begin_total + 1) == this->list.size) && out_bounds) {
-          this->list.change_size(this->list.size * 2);
-          break;
-        }
+      if (((end_total - begin_total + 1) == this->list.size) && out_bounds) {
+        this->list.change_size(this->list.size * 2);
+        end_total = this->list.size - 1;
       }
 
       if (this->list.values[pos].is_null) 
@@ -233,220 +240,115 @@ class OrderedFile {
       else 
         this->list.shift_left(pos);
       this->list.values[pos] = item;
+      redistribute(begin_total, end_total);
+    }
+
+    void remove(int x) {
+      int pos = binary_search(x); 
+      if(this->list.values[pos].value != x) return;
+
+      this->list.values[pos].is_null = true;
+
+      int range = this->list.get_range();
+      int begin =  pos - (pos % range); 
+      int end = (begin + range - 1) >= this->list.size ? this->list.size - 1 : begin + range - 1;
+
+      int end_total = end;
+      int begin_total = begin;
+
+      int size = end - begin + 1;
+      int element_count = this->list.get_n(begin, end);
+      int leaf_idx = begin / range;
+      int range_increase = 1;
+      
+      double density = this->list.get_density(begin, end, element_count);
+      int depth = this->list.get_height();
+      pair<double, double> bound = this->list.get_density_bound(depth);
+      bool out_bounds =  density > bound.second || density < bound.first;
+
+      while(out_bounds && !((end_total - begin_total + 1) == this->list.size)) {
+        if (leaf_idx & 1) {
+          end = begin - 1;
+          begin = begin - range_increase * range;
+        }
+        else {
+          begin = end + 1;  
+          end = end + range_increase * range;
+          if(end > this->list.size - 1) 
+            end = this->list.size - 1;
+        }
+
+        range_increase *= 2;
+        leaf_idx = leaf_idx >> 1;
+        begin_total =  begin < begin_total ? begin : begin_total;
+        end_total =  end > end_total ? end : end_total;
+
+        size += end - begin + 1; 
+        element_count += this->list.get_n(begin, end);
+        density = ((double) element_count / size); 
+        depth--;
+
+        bound = this->list.get_density_bound(depth);
+        out_bounds =  density > bound.second || density < bound.first;
+      }
+
+      if (((end_total - begin_total + 1) == this->list.size) && out_bounds) {
+        this->list.change_size(this->list.size/2);
+        end_total = this->list.size - 1;
+      }
 
       redistribute(begin_total, end_total);
     }
 
-    void remove(int x){
-      int pos = binary_search(x);
+    int successor(int x) { 
+      int pos = binary_search(x); 
+      if(this->list.values[pos].value == x) 
+        while(this->list.values[pos++].is_null);
+      
+      if(this->list.values[pos].is_null) return 99999;
+      return this->list.values[pos].value;
     }
-    
     void print() { this->list.print(); }
+    void print(ofstream& file) { this->list.print(file); }
 };
 
 int main() {
-  OrderedFile file;
+  OrderedFile orderedFile;
 
-file.insert(145);
-file.print();
-file.insert(108);
-file.print();
-file.insert(162);
-file.print();
-file.insert(189);
-file.print();
-file.insert(136);
-file.print();
-file.insert(151);
-file.print();
-file.insert(172);
-file.print();
-file.insert(110);
-file.print();
-file.insert(196);
-file.print();
-file.insert(130);
-file.print();
-file.insert(177);
-file.print();
-file.insert(122);
-file.print();
-file.insert(185);
-file.print();
-file.insert(133);
-file.print();
-file.insert(101);
-file.print();
-file.insert(198);
-file.print();
-file.insert(154);
-file.print();
-file.insert(123);
-file.print();
-file.insert(139);
-file.print();
-file.insert(147);
-file.print();
-file.insert(113);
-file.print();
-file.insert(103);
-file.print();
-file.insert(194);
-file.print();
-file.insert(159);
-file.print();
-file.insert(179);
-file.print();
-file.insert(165);
-file.print();
-file.insert(173);
-file.print();
-file.insert(199);
-file.print();
-file.insert(109);
-file.print();
-file.insert(141);
-file.print();
-file.insert(132);
-file.print();
-file.insert(114);
-file.print();
-file.insert(160);
-file.print();
-file.insert(111);
-file.print();
-file.insert(193);
-file.print();
-file.insert(107);
-file.print();
-file.insert(169);
-file.print();
-file.insert(155);
-file.print();
-file.insert(175);
-file.print();
-file.insert(116);
-file.print();
-file.insert(187);
-file.print();
-file.insert(125);
-file.print();
-file.insert(144);
-file.print();
-file.insert(153);
-file.print();
-file.insert(120);
-file.print();
-file.insert(140);
-file.print();
-file.insert(167);
-file.print();
-file.insert(135);
-file.print();
-file.insert(190);
-file.print();
-file.insert(128);
-file.print();
-file.insert(118);
-file.print();
-file.insert(176);
-file.print();
-file.insert(104);
-file.print();
-file.insert(102);
-file.print();
-file.insert(121);
-file.print();
-file.insert(142);
-file.print();
-file.insert(157);
-file.print();
-file.insert(126);
-file.print();
-file.insert(192);
-file.print();
-file.insert(148);
-file.print();
-file.insert(138);
-file.print();
-file.insert(112);
-file.print();
-file.insert(149);
-file.print();
-file.insert(124);
-file.print();
-file.insert(158);
-file.print();
-file.insert(106);
-file.print();
-file.insert(161);
-file.print();
-file.insert(129);
-file.print();
-file.insert(131);
-file.print();
-file.insert(156);
-file.print();
-file.insert(117);
-file.print();
-file.insert(163);
-file.print();
-file.insert(186);
-file.print();
-file.insert(152);
-file.print();
-file.insert(119);
-file.print();
-file.insert(143);
-file.print();
-file.insert(137);
-file.print();
-file.insert(166);
-file.print();
-file.insert(134);
-file.print();
-file.insert(115);
-file.print();
-file.insert(150);
-file.print();
-file.insert(200);
-file.print();
-file.insert(105);
-file.print();
-file.insert(191);
-file.print();
-file.insert(164);
-file.print();
-file.insert(146);
-file.print();
-file.insert(170);
-file.print();
-file.insert(188);
-file.print();
-file.insert(171);
-file.print();
-file.insert(197);
-file.print();
-file.insert(168);
-file.print();
-file.insert(180);
-file.print();
-file.insert(127);
-file.print();
-file.insert(184);
-file.print();
-file.insert(181);
-file.print();
-file.insert(178);
-file.print();
-file.insert(182);
-file.print();
-file.insert(174);
-file.print();
-file.insert(183);
-file.print();
-file.insert(100);
-file.print();
+  ifstream file("./test/1.txt");
+  ofstream output_file("out.txt");
 
+  if (file.is_open() && output_file.is_open()) {    
+    string line;
+    while (getline(file, line)) {
+      istringstream iss(line); 
+      string command; 
+      iss >> command; 
+      if (command == "INC") {
+        int number;
+        iss >> number;
+        cout << "INC " << number << endl;
+        orderedFile.insert(number);
+      }
+      else if(command == "REM") {
+        int number;
+        iss >> number;
+        cout << "REM " << number <<endl;
+        orderedFile.remove(number);
+      }
+      else if (command == "SUC") {
+        int number;
+        iss >> number;
+        cout << "SUC " << number << endl;
+        output_file << orderedFile.successor(number) << endl;
+      }
+      else if(command == "IMP") {
+        cout << "IMP" << endl;
+        orderedFile.print(output_file);
+      }
+    }
+    file.close();
+    output_file.close();
+  }
   return 0;
 }
