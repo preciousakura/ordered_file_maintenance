@@ -266,6 +266,8 @@ class OrderedFile {
       pair<double, double> bound = this->list.get_density_bound(depth);
       bool out_bounds =  density > bound.second || density < bound.first;
 
+      if(!out_bounds) return;
+
       while(out_bounds && !((end_total - begin_total + 1) == this->list.size)) {
         if (leaf_idx & 1) {
           end = begin - 1;
